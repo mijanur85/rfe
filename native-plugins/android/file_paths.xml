@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Real device photos/videos live under external storage (DCIM, Pictures,
+         WhatsApp, Downloads, etc.). Capacitor's Share plugin only allows
+         sharing from the app's own cache folder by default, so this widens
+         it to the whole external storage root. Without this, the native
+         Share sheet fails/rejects for any real gallery file. -->
+    <external-path name="external_files" path="." />
+    <cache-path name="cache" path="." />
+    <files-path name="files" path="." />
+</paths>

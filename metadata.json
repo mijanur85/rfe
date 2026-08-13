@@ -1,0 +1,6 @@
+{
+  "name": "Neo Gallery",
+  "description": "Neo Gallery for Android - Next-generation photo and video gallery application optimized for Android 15 with Quick Share, Private Vault, Smart Storage Cleaner, and Artistic themes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,85 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Setup Capacitor Android
+        run: |
+          rm -rf android
+          npx cap add android
+          mkdir -p android/app/src/main/java/com/neogallery/app
+          cp native-plugins/android/MediaStorePlugin.java android/app/src/main/java/com/neogallery/app/MediaStorePlugin.java
+          mkdir -p android/app/src/main/res/xml
+          cp native-plugins/android/file_paths.xml android/app/src/main/res/xml/file_paths.xml
+
+          # Patch MainActivity.java to register MediaStorePlugin
+          cat << 'EOF' > android/app/src/main/java/com/neogallery/app/MainActivity.java
+          package com.neogallery.app;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(MediaStorePlugin.class);
+                  super.onCreate(savedInstanceState);
+              }
+          }
+          EOF
+
+          # Ensure AndroidManifest permissions
+          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST_FILE" ]; then
+            if ! grep -q "READ_MEDIA_IMAGES" "$MANIFEST_FILE"; then
+              sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />' "$MANIFEST_FILE"
+            fi
+            # MANAGE_EXTERNAL_STORAGE ("All files access") is needed to create
+            # a real, empty on-device Pictures/<album> folder for Create Album --
+            # MediaStore itself has no API to create an empty shared folder, it
+            # only creates one implicitly once a file is written into it.
+            if ! grep -q "MANAGE_EXTERNAL_STORAGE" "$MANIFEST_FILE"; then
+              sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />' "$MANIFEST_FILE"
+            fi
+          fi
+
+          npx cap sync android
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo-gallery-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
